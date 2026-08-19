@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  year      String   @unique
+  startsOn  DateTime
+  endsOn    DateTime
+  isCurrent Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  programs          Program[]
+  teachingRequirements TeachingRequirement[]
+  timetableVersions TimetableVersion[]
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  color     String?  @default("#2E7D6E")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  programs               Program[]
+  faculty                 Faculty[]
+  subjects                Subject[]
+  territories             DepartmentTerritory[]
+  resources               Resource[]
+  teachingRequirements    TeachingRequirement[]
+  policies                Policy[]
+}
+
+model Program {
+  id             String   @id @default(uuid())
+  name           String
+  code           String
+  departmentId   String
+  academicYearId String
+  durationYears  Int      @default(4)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  levels       AcademicLevel[]
+
+  @@unique([departmentId, code])
+  @@index([academicYearId])
+}
+
+model AcademicLevel {
+  id        String   @id @default(uuid())
+  name      String
+  code      String
+  yearIndex Int
+  programId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  program   Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
+  divisions Division[]
+  teachingRequirements TeachingRequirement[]
+
+  @@unique([programId, yearIndex])
+}
+
+model Division {
+  id              String   @id @default(uuid())
+  name            String
+  code            String
+  academicLevelId String
+  studentCount    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  academicLevel AcademicLevel @relation(fields: [academicLevelId], references: [id], onDelete: Cascade)
+  batches       Batch[]
+  teachingRequirements TeachingRequirement[]
+  combinedRequirements TeachingRequirement[] @relation("CombinedDivisions")
+
+  @@unique([academicLevelId, code])
+}
+
+model Batch {
+  id           String   @id @default(uuid())
+  name         String
+  code         String
+  divisionId   String
+  studentCount Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  division             Division              @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  teachingRequirements TeachingRequirement[]
+
+  @@unique([divisionId, code])
+}
+
+model Faculty {
+  id                String   @id @default(uuid())
+  employeeCode      String   @unique
+  name              String
+  email             String   @unique
+  title             String?
+  departmentId      String
+  maxWeeklyWorkload Float    @default(18)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  department           Department            @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  availabilities       FacultyAvailability[]
+  eligibility          FacultyEligibility[]
+  teachingRequirements TeachingRequirement[]
+
+  @@index([departmentId])
+}
+
+model FacultyAvailability {
+  id        String             @id @default(uuid())
+  facultyId String
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  status    AvailabilityStatus @default(HARD_UNAVAILABLE)
+  note      String?
+
+  faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+
+  @@index([facultyId, dayOfWeek])
+}
+
+model FacultyEligibility {
+  id         String   @id @default(uuid())
+  facultyId  String
+  subjectId  String
+  proficiencyLevel Int @default(1)
+  isPrimary  Boolean  @default(false)
+  validFrom  DateTime?
+  validUntil DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  faculty Faculty @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([facultyId, subjectId])
+  @@index([subjectId])
+}
+
+model Subject {
+  id            String      @id @default(uuid())
+  code          String      @unique
+  name          String
+  departmentId  String
+  credits       Float
+  defaultType   SessionType @default(LECTURE)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  department           Department            @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  eligibleFaculty      FacultyEligibility[]
+  teachingRequirements TeachingRequirement[]
+}
+
+model Building {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  latitude  Float?
+  longitude Float?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  floors    Floor[]
+  resources Resource[]
+}
+
+model Floor {
+  id         String   @id @default(uuid())
+  name       String
+  floorNumber Int
+  buildingId String
+
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  territories DepartmentTerritory[]
+  resources   Resource[]
+
+  @@unique([buildingId, floorNumber])
+}
+
+model DepartmentTerritory {
+  id           String @id @default(uuid())
+  name         String
+  floorId      String
+  departmentId String
+
+  floor      Floor      @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  resources  Resource[]
+
+  @@unique([floorId, departmentId, name])
+}
+
+model Resource {
+  id            String       @id @default(uuid())
+  name          String
+  code          String       @unique
+  resourceType  ResourceType
+  capacity      Int
+  buildingId    String
+  floorId       String
+  territoryId   String?
+  departmentId  String?
+  isActive      Boolean      @default(true)
+  capabilities  String[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  building   Building             @relation(fields: [buildingId], references: [id], onDelete: Restrict)
+  floor      Floor                @relation(fields: [floorId], references: [id], onDelete: Restrict)
+  territory  DepartmentTerritory? @relation(fields: [territoryId], references: [id], onDelete: SetNull)
+  department Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  availabilities ResourceAvailability[]
+
+  @@index([resourceType, isActive])
+  @@index([buildingId, floorId])
+}
+
+model ResourceAvailability {
+  id         String             @id @default(uuid())
+  resourceId String
+  dayOfWeek  DayOfWeek
+  startTime  String
+  endTime    String
+  status     AvailabilityStatus @default(HARD_UNAVAILABLE)
+  note       String?
+
+  resource Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+}
+
+model TeachingRequirement {
+  id                   String      @id @default(uuid())
+  academicYearId       String
+  subjectId            String
+  facultyId            String
+  departmentId         String
+  academicLevelId      String
+  divisionId           String?
+  batchId              String?
+  isCombined            Boolean     @default(false)
+  sessionType           SessionType
+  durationPeriods       Int
+  weeklyFrequency       Int
+  requiredResourceType  ResourceType
+  requiredCapabilities String[]
+  preferredDays         DayOfWeek[]
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  academicYear       AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  subject            Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  faculty            Faculty      @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  department         Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  academicLevel      AcademicLevel @relation(fields: [academicLevelId], references: [id], onDelete: Restrict)
+  division           Division?     @relation(fields: [divisionId], references: [id], onDelete: Restrict)
+  batch              Batch?        @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  combinedDivisions  Division[]    @relation("CombinedDivisions")
+
+  @@index([academicYearId, departmentId])
+  @@index([facultyId])
+}
+
+model Policy {
+  id           String     @id @default(uuid())
+  name         String
+  departmentId String?
+  policyType   PolicyType
+  rulesJson    Json
+  weight       Int        @default(100)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@index([departmentId, policyType])
+}
+
+model TimetableVersion {
+  id             String          @id @default(uuid())
+  academicYearId String
+  name           String
+  status         TimetableStatus @default(DRAFT)
+  dataJson       Json
+  validationJson Json?
+  objectiveScore Float?
+  version        Int             @default(1)
+  generatedAt    DateTime        @default(now())
+  reviewedAt     DateTime?
+  publishedAt    DateTime?
+
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+
+  @@unique([academicYearId, version])
+}
+
+enum ResourceType {
+  CLASSROOM
+  LAB
+  WORKSHOP
+}
+
+enum SessionType {
+  LECTURE
+  PRACTICAL
+  TUTORIAL
+  SEMINAR
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  HARD_UNAVAILABLE
+}
+
+enum PolicyType {
+  RESOURCE_FALLBACK
+  TIME_PREFERENCE
+  GAP_MINIMIZATION
+  BUILDING_MOVEMENT
+  CUSTOM
+}
+
+enum TimetableStatus {
+  DRAFT
+  REVIEWED
+  PUBLISHED
+}

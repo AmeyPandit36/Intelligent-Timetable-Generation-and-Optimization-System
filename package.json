@@ -1,0 +1,30 @@
+{
+  "name": "intelligent-college-timetable",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Intelligent college timetable generation and optimization platform",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,green \"npm run dev -w @timetable/api\" \"npm run dev -w @timetable/web\"",
+    "dev:web": "npm run dev -w @timetable/web",
+    "dev:api": "npm run dev -w @timetable/api",
+    "build": "npm run build -w @timetable/api && npm run build -w @timetable/web",
+    "test": "npm run test -w @timetable/api && npm run test -w @timetable/web",
+    "typecheck": "npm run typecheck -w @timetable/api && npm run typecheck -w @timetable/web",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "solver:test": ".venv/bin/python -m pytest tests -q"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "prisma": "6.12.0",
+    "tsx": "^4.19.3"
+  }
+}

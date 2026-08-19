@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: timetable
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d timetable"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - timetable-postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  solver:
+    build:
+      context: .
+      dockerfile: solver/Dockerfile
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "8000:8000"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/timetable?schema=public
+      SOLVER_URL: http://solver:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      solver:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  timetable-postgres:
